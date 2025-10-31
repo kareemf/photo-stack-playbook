@@ -1,7 +1,9 @@
-# 📸 Photo-Stack: Immich + PhotoPrism Hybrid Setup & Runbook
-   
+# 📸 Immich + PhotoPrism Hybrid Photo-Stack Setup Playbook
+
+A guide to deploying a self-hosted photo management stack.
+
 ## Goal
-Run **Immich** (a Google Photos analog for mobile photo uploads and viewing) and **PhotoPrism** (a Adobe Lightroom analog for metadata management and archival) on a **Mac** with a **Docker-capable NAS**, using:
+Run [Immich](https://immich.app) (a Google Photos analog for mobile photo uploads and viewing) and [PhotoPrism](https://photoprism.app) (a Adobe Lightroom analog for metadata management and archival) on a **Mac** with a **Docker-capable NAS**, using:
 
 * Shared NAS storage
 * Tailscale for secure remote access
@@ -19,7 +21,7 @@ Should work about the same on Linux but hasn't been tested
    1. Tag, rate, add keywords; PP writes XMP/sidecars.
    2. Work with RAW files
 5. Run weekly DB backups → NAS `/photos/backups/`
-6. **Remote access** via **Tailscale** (private) or **Caddy** (public)
+6. Remote access via Tailscale (private) or Caddy (public)
 
 ## 🧬 Architecture Overview
 
@@ -91,8 +93,8 @@ photo-stack/
 ### Clone repo
 
 ```sh
-git clone git@github.com:kareemf/photo-stack.git
-cd photo-stack
+git clone git@github.com:kareemf/photo-stack-playbook.git
+cd photo-stack-playbook
 ```
 
 ### Create .env file
