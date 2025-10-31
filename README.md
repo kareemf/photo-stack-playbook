@@ -64,7 +64,7 @@ photo-stack/
 │   └── setup_nas_mount.sh
 │   └── setup_backup_launch_agent.sh
 │   └── backup_photo_dbs.sh
-├── .env
+├── .env.exmaple 
 ├── .gitignore
 └── README.md
 ```
@@ -93,6 +93,12 @@ photo-stack/
 ```sh
 git clone git@github.com:kareemf/photo-stack.git
 cd photo-stack
+```
+
+### Create .env file
+
+```sh
+cp .env.example .env
 ```
 
 ### Setup NAS Directories 
