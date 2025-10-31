@@ -48,10 +48,28 @@ for var in NAS_USER NAS_USERPASS NAS_HOST; do
   fi
 done
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required for credential encoding." >&2
+  exit 1
+fi
+
+urlencode() {
+  local value="$1"
+  local safe_chars="${2:-}"
+  python3 -c 'import sys, urllib.parse as p; print(p.quote(sys.argv[1], safe=sys.argv[2]))' "$value" "$safe_chars"
+}
+
 NAS_SHARE="${NAS_SHARE:-photos}"
 MOUNT_POINT="/Volumes/Photos"
 AUTO_MASTER_D="/etc/auto_master.d/photos.autofs"
 AUTO_MAP="/etc/auto_photos"
+
+NAS_USER_ESC="$(urlencode "$NAS_USER")"
+NAS_PASS_ESC="$(urlencode "$NAS_USERPASS")"
+NAS_SHARE_ESC="$(urlencode "$NAS_SHARE" "/")"
+SMB_URL="//${NAS_USER_ESC}:${NAS_PASS_ESC}@${NAS_HOST}/${NAS_SHARE_ESC}"
+SMB_URL_REDACTED="//${NAS_USER_ESC}:********@${NAS_HOST}/${NAS_SHARE_ESC}"
+AUTO_MASTER_DIR="$(dirname "$AUTO_MASTER_D")"
 
 run_cmd() {
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -99,15 +117,22 @@ if mount | grep -q "on ${MOUNT_POINT} "; then
   echo "$MOUNT_POINT already mounted."
 else
   echo "Mounting SMB share for immediate use (password prompt may appear)..."
-  run_cmd mount_smbfs "//${NAS_USER}@${NAS_HOST}/${NAS_SHARE}" "$MOUNT_POINT"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "[dry-run] sudo mount_smbfs ${SMB_URL_REDACTED} $MOUNT_POINT"
+  else
+    run_sudo_cmd mount_smbfs "${SMB_URL}" "$MOUNT_POINT"
+  fi
 fi
 
 echo "Configuring autofs entries"
 backup_if_exists "$AUTO_MASTER_D"
 backup_if_exists "$AUTO_MAP"
 
+echo "Ensuring autofs directories exist"
+run_sudo_cmd mkdir -p "$AUTO_MASTER_DIR"
+
 write_file_as_root "$AUTO_MASTER_D" "/Volumes/Photos auto_photos"
-write_file_as_root "$AUTO_MAP" "Photos -fstype=smbfs ://${NAS_USER}:${NAS_USERPASS}@${NAS_HOST}/${NAS_SHARE}"
+write_file_as_root "$AUTO_MAP" "Photos -fstype=smbfs :${SMB_URL}"
 
 echo "Reloading autofs maps"
 run_sudo_cmd automount -cv
