@@ -66,22 +66,24 @@ photo-stack/
 │   └── setup_nas_mount.sh
 │   └── setup_backup_launch_agent.sh
 │   └── backup_photo_dbs.sh
-├── .env.exmaple 
+├── .env.example
 ├── .gitignore
 └── README.md
 ```
 
 ## 📂 NAS Directory Structure
 
+Subject to change but hopefully helpful overview
+
 ```
 /photos/
 ├── originals/                 # Main library (RAW/JPG/Video)
-├── uploads/from-immich/       # Mobile auto-upload inbox
+├── uploads/
+│   ├── from-immich/           # Mobile auto-upload inbox
 ├── photoprism/                # PP cache + sidecars
 │   ├── storage/
-│   └── cache/
-├── immich/                    # Immich thumbsnails/cache
-│   └── thumbs/
+├── immich/                    # Immich DB
+│   └── postgres/
 └── backups/                   # DB and config backups
     ├── immich/
     └── photoprism/
@@ -101,6 +103,7 @@ cd photo-stack-playbook
 
 ```sh
 cp .env.example .env
+ln -s .env compose/.env
 ```
 
 ### Setup NAS Directories 
@@ -167,6 +170,16 @@ make photoprism logs
 
 Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. Override `ENV_FILE`, `STACK`, or `TAIL` on the command line if needed (e.g. `make STACK=immich TAIL=200 logs`).
 
+
+💡 Handy commands once everything is up and running
+```sh
+make immich down && make immich up && make immich logs follow
+```
+
+```sh
+make photoprism down && make photoprism up && make photoprism logs follow
+```
+
 #### Manual Commands
 ```bash
 # Start Immich (Mac mini)
@@ -184,20 +197,24 @@ docker compose --env-file .env -f compose/photoprism.yml up -d
 docker ps
 docker compose --env-file .env -f compose/immich.yml logs -f --tail=100 immich-server
 docker compose --env-file .env -f compose/photoprism.yml logs -f --tail=100 photoprism
-
 ```
+
+#### Addresses
+
+PhotoPrism should be available at http://127.0.0.1:2342/
+Immich should be available at http://127.0.0.1:2283/
 
 ### Staggered First-Run Indexing
 
 ```sh
 # Run PhotoPrism indexing first
-docker exec -it photoprism photoprism index
+docker compose --env-file .env -f compose/photoprism.yml exec photoprism photoprism index
 
 # Then let Immich scan (it auto-indexes on start;
 # if needed, restart after PP completes)
-docker restart immich-server
-
+docker compose --env-file .env -f compose/immich.yml restart immich-server
 ```
+
 
 ## 💾 Backup DB + Configs to NAS
 
