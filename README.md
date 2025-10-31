@@ -133,6 +133,16 @@ Re-run the script after reboots to reconnect, or add it to your login items if y
 
 If you change `NAS_MOUNT_POINT`, remember to update any Docker bind mounts (see the files in `compose/`) so they point to the same path.
 
+Optional: create a user LaunchAgent so the mount script runs at login (and optionally retries):
+
+```bash
+chmod +x scripts/setup_mount_launch_agent.sh
+./scripts/setup_mount_launch_agent.sh          # add --interval 900 to retry every 15 minutes
+launchctl load ~/Library/LaunchAgents/com.user.photo-mount.plist
+```
+
+Disable with `launchctl unload ~/Library/LaunchAgents/com.user.photo-mount.plist`. Delete the plist if you no longer need the auto-mount.
+
 ### 🐳 Docker Compose
  
 *(See the `compose/` directory for full definitions.)*
