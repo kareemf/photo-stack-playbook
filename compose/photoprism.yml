@@ -1,0 +1,35 @@
+version: "3.9"
+services:
+  photoprism:
+    image: photoprism/photoprism:latest
+    container_name: photoprism
+    depends_on: [mariadb]
+    environment:
+      PHOTOPRISM_ADMIN_PASSWORD: ${PHOTOPRISM_ADMIN_PASSWORD}
+      PHOTOPRISM_ORIGINALS_PATH: /photoprism/originals
+      PHOTOPRISM_STORAGE_PATH:   /photoprism/storage
+      PHOTOPRISM_IMPORT_PATH:    /photoprism/import
+      PHOTOPRISM_READONLY: "false"
+      TZ: America/New_York
+    volumes:
+      - /photos/originals:/photoprism/originals:rw
+      - /photos/photoprism/storage:/photoprism/storage
+      - /photos/uploads/from-immich:/photoprism/import:rw
+    ports:
+      - "2342:2342"
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: photoprism-db
+    environment:
+      MARIADB_ROOT_PASSWORD: ${PHOTOPRISM_DB_ROOT}
+      MARIADB_DATABASE: photoprism
+      MARIADB_USER: photoprism
+      MARIADB_PASSWORD: ${PHOTOPRISM_DB_PASS}
+    volumes:
+      - photoprism_db:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  photoprism_db:

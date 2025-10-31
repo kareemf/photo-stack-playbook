@@ -1,0 +1,41 @@
+version: "3.9"
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich-server
+    depends_on: [immich-db, immich-redis]
+    environment:
+      DB_HOST: immich-db
+      DB_PASSWORD: ${IMMICH_DB_PASSWORD}
+      DB_USERNAME: immich
+      DB_DATABASE_NAME: immich
+      TZ: America/New_York
+    volumes:
+      # READ-ONLY view of masters
+      - /Volumes/Photos/originals:/usr/src/app/upload:ro
+      # Immich thumbs/caches isolated from masters
+      - /Volumes/Photos/immich/thumbs:/usr/src/app/thumbs
+      # (optional) landing area for phone uploads (RW)
+      - /Volumes/Photos/uploads/from-immich:/usr/src/app/external-uploads
+    ports:
+      - "2283:2283"
+    restart: unless-stopped
+
+  immich-redis:
+    image: redis:7-alpine
+    container_name: immich-redis
+    restart: unless-stopped
+
+  immich-db:
+    image: postgres:15-alpine
+    container_name: immich-db
+    environment:
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD}
+      POSTGRES_USER: immich
+      POSTGRES_DB: immich
+    volumes:
+      - immich_db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  immich_db:
