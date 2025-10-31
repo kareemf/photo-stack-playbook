@@ -115,20 +115,23 @@ mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage,cache},immi
 
 ### Persistent Mount of NAS on Mac
 
-Use the helper script to configure SMB mounting and autofs from the credentials in `.env` (`NAS_USER`, `NAS_USERPASS`, `NAS_HOST`, optional `NAS_SHARE` will fall back to `photos`):
+Use the helper script to mount your NAS share with the credentials in `.env` (`NAS_USER`, `NAS_USERPASS`, `NAS_HOST`; optional `NAS_SHARE` defaults to `photos`; `NAS_MOUNT_POINT` defaults to `/Volumes/Photos`):
 
 ```bash
 chmod +x scripts/setup_nas_mount.sh
 ./scripts/setup_nas_mount.sh          # add --dry-run to preview without changes
 ```
 
-The script:
+The script runs entirely without `sudo`. Make sure `NAS_MOUNT_POINT` already exists and is writable by your macOS user (create it manually if you stick with `/Volumes/Photos`, or set `NAS_MOUNT_POINT` to a directory under your home folder). To prepare the default path once:
 
-* Creates `/Volumes/Photos` (with `sudo`) and performs an immediate SMB mount.
-* Writes `/etc/auto_master.d/photos.autofs` and `/etc/auto_photos` for automatic mounting.
-* Runs `automount -cv` so the share reconnects whenever `/Volumes/Photos` is accessed.
+```bash
+sudo mkdir -p /Volumes/Photos
+sudo chown "$USER":staff /Volumes/Photos
+```
 
-Expect to be prompted for your macOS password when `sudo` is required.
+Re-run the script after reboots to reconnect, or add it to your login items if you want it mounted automatically. Unmount manually with `umount "$NAS_MOUNT_POINT"`.
+
+If you change `NAS_MOUNT_POINT`, remember to update any Docker bind mounts (see the files in `compose/`) so they point to the same path.
 
 ### 🐳 Docker Compose
  

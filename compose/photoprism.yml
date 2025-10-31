@@ -12,9 +12,9 @@ services:
       PHOTOPRISM_READONLY: "false"
       TZ: America/New_York
     volumes:
-      - /photos/originals:/photoprism/originals:rw
-      - /photos/photoprism/storage:/photoprism/storage
-      - /photos/uploads/from-immich:/photoprism/import:rw
+      - ${NAS_MOUNT_POINT}/originals:/photoprism/originals:rw
+      - ${NAS_MOUNT_POINT}/photoprism/storage:/photoprism/storage
+      - ${NAS_MOUNT_POINT}/uploads/from-immich:/photoprism/import:rw
     ports:
       - "2342:2342"
     restart: unless-stopped
