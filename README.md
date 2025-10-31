@@ -147,6 +147,27 @@ Disable with `launchctl unload ~/Library/LaunchAgents/com.user.photo-mount.plist
  
 *(See the `compose/` directory for full definitions.)*
 
+#### Makefile Helpers
+Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or both:
+
+```bash
+make up # Start both stacks
+make immich up
+make photoprism up
+
+make down # Stop both stacks
+make immich down
+make photoprism down
+
+make logs # Aggregated tail logs for both stacks
+make logs follow
+make immich logs
+make photoprism logs
+```
+
+Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. Override `ENV_FILE`, `STACK`, or `TAIL` on the command line if needed (e.g. `make STACK=immich TAIL=200 logs`).
+
+#### Manual Commands
 ```bash
 # Start Immich (Mac mini)
 docker compose --env-file .env -f compose/immich.yml pull
