@@ -1,7 +1,7 @@
-.PHONY: up down pull logs immich photoprism both
+.PHONY: up down pull logs immich photoprism all caddy follow
 
-STACK ?= both
-STACK_TARGETS := immich photoprism both
+STACK ?= all
+STACK_TARGETS := immich photoprism all caddy
 
 FIRST_GOAL := $(firstword $(MAKECMDGOALS))
 
@@ -15,7 +15,8 @@ COMPOSE_DIR := compose
 
 COMPOSE_FILES_immich := $(COMPOSE_DIR)/immich.yml
 COMPOSE_FILES_photoprism := $(COMPOSE_DIR)/photoprism.yml
-COMPOSE_FILES_both := $(COMPOSE_FILES_immich) $(COMPOSE_FILES_photoprism)
+COMPOSE_FILES_caddy := $(COMPOSE_DIR)/caddy.yml
+COMPOSE_FILES_all := $(COMPOSE_FILES_immich) $(COMPOSE_FILES_photoprism) $(COMPOSE_FILES_caddy)
 
 COMPOSE_FILES = $(COMPOSE_FILES_$(STACK))
 
@@ -44,5 +45,8 @@ logs:
 	@echo "Tailing logs for $(STACK) stack..."
 	@$(call compose_with,$(COMPOSE_FILES)) logs --tail=$(TAIL) $(FOLLOW)
 
-immich photoprism both:
+immich photoprism all caddy:
+	@true
+
+follow:
 	@true

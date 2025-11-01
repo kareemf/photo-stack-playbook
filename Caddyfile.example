@@ -1,0 +1,60 @@
+# Landing domain (optional informational responses)
+http://{$PUBLIC_DOMAIN} {
+  encode gzip zstd
+
+  handle_path /healthz {
+    respond "ok" 200
+  }
+
+  handle {
+    respond "PhotoPrism → https://{$PHOTOPRISM_PUBLIC_DOMAIN}/, Immich → https://{$IMMICH_PUBLIC_DOMAIN}/" 200
+  }
+}
+
+# PhotoPrism public entrypoint (dedicated subdomain)
+http://{$PHOTOPRISM_PUBLIC_DOMAIN} {
+  encode gzip zstd
+
+  reverse_proxy {env.PHOTOPRISM_UPSTREAM} {
+    header_up Host {http.request.host}
+    header_up X-Forwarded-Host {http.request.host}
+    header_up X-Forwarded-Proto {http.request.scheme}
+  }
+}
+
+# Immich public entrypoint (still requires own host)
+http://{$IMMICH_PUBLIC_DOMAIN} {
+  encode gzip zstd
+
+  reverse_proxy {env.IMMICH_UPSTREAM} {
+    header_up Host {http.request.host}
+    header_up X-Forwarded-Host {http.request.host}
+    header_up X-Forwarded-Proto {http.request.scheme}
+  }
+}
+
+# Tailscale entrypoint when using MagicDNS + tailscale cert
+{$TS_NODE} {
+  tls /etc/certs/{$TS_NODE}.crt /etc/certs/{$TS_NODE}.key
+  encode gzip zstd
+
+  handle /prism {
+    redir /prism/ 302
+  }
+
+  @ts_prism path /prism/*
+  handle @ts_prism {
+    reverse_proxy {env.PHOTOPRISM_UPSTREAM} {
+      header_up Host {http.request.host}
+      header_up X-Forwarded-Host {http.request.host}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_up X-Forwarded-Prefix /prism
+    }
+  }
+
+  reverse_proxy {env.IMMICH_UPSTREAM} {
+    header_up Host {http.request.host}
+    header_up X-Forwarded-Host {http.request.host}
+    header_up X-Forwarded-Proto {http.request.scheme}
+  }
+}

@@ -1,6 +1,7 @@
 # Secrets & local env
 .env
 compose/.env
+compose/Caddyfile
 
 # Database dumps
 *.sql

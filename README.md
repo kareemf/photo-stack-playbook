@@ -62,10 +62,13 @@ photo-stack/
 ├── compose/
 │   ├── immich.yml
 │   └── photoprism.yml
+│   └── caddy.yml
 ├── scripts/
 │   └── setup_nas_mount.sh
 │   └── setup_backup_launch_agent.sh
 │   └── backup_photo_dbs.sh
+│   └── ...
+├── Caddyfile.example
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -108,8 +111,10 @@ ln -s .env compose/.env
 
 ### Setup NAS Directories 
 
+On your storage device
+
 ```sh
-mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage,cache},immich/thumbs}
+mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage},immich,backups}
 ```
 
 ...or do it manually
@@ -152,7 +157,7 @@ Disable with `launchctl unload ~/Library/LaunchAgents/com.user.photo-mount.plist
 *(See the `compose/` directory for full definitions.)*
 
 #### FYI: Makefile Helpers
-Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or both:
+Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or Caddy:
 
 ```bash
 make up # Start both stacks
@@ -306,11 +311,11 @@ Use `./scripts/setup_backup_launch_agent.sh --help` to see override options.
 
 ---
 
-## 🔐 Secure Remote Access
+## 🔐 Secure Remote Access + Pretty Names
 
-### 🔐 Tailscale (Recommended)
+### Private Remote Access With Tailscale
 
-Use **Tailscale** for private, end-to-end encrypted access to your stack without port forwarding.
+Use **Tailscale** for private, end-to-end encrypted access to your stack without touching router port-forwarding.
 
 📘 **Documentation:**
 
@@ -325,50 +330,389 @@ Typical access pattern:
 Use [Access Control Lists (ACLs)](https://tailscale.com/kb/1018/acls)[ss Control Lists (ACLs)](https://tailscale.com/kb/1018/acls) to restrict access by user or device.
 For secure collaboration, grant Tailnet access to trusted family devices only.
 
----
+Note that you do not need to run the Caddy container if this is where you plan to stop.
 
-### 🌍 Sharing with Non-Tailnet Users
+### Public Remote Access (Sharing with Non-Tailnet Users) + Custom Domains
 
-If friends/family don’t use Tailscale, use a **reverse proxy** for public HTTPS access.
+#### Choose your exposure model
+- **Cloudflare Tunnel** (no port-forwarding, works with custom domains `immich.example.com` / `prism.example.com`)
+  - No additional costs beyond domain registration
+- **Public DNS + Caddy (Let’s Encrypt)**: requires DNS control over `example.com` *and* ports 80/443 reachable from the internet.
+    - Additional cost of ~$5+ per month for a VPS 
+    - Additional security considerations if port-forwarding on home router
 
-#### Option 1: Caddy
+In either case, the end state should be 
+- `immich.example.come` and `prism.example.come` are globally accessible
+- Your home stack stays private behind Tailscale and/or Cloudflare
+- End‑to‑end encryption with TLS certificates
+
+#### Cloudflare Tunnel
+
+Like Tailscale Funnel, [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/) keeps services private but reachable without port-forwarding or setting up a VPS. Unlike Funnel, it supports custom domains 
+
+**Benefits:**
+- No router port-forwarding required
+- No VPS costs (~$5/month savings vs DigitalOcean)
+- Cloudflare handles DDoS protection and TLS termination
+- Works on free tier
+
+**Requirements:**
+- Domain registered with Cloudflare. Partial CNAME setup [not supported on free tier](https://developers.cloudflare.com/dns/zone-setups/partial-setup/))
+- `cloudflared` daemon running on a machine (same host as Docker or separate)
+
+##### Configuration Options
+
+The setup varies based on two key decisions:
+
+| Decision            | Option A (Recommended) | Option B                    | Notes                       |
+| ------------------- | ---------------------- | --------------------------- | --------------------------- |
+| **TLS Termination** | Cloudflare handles TLS | Caddy handles TLS           | Option A is simpler         |
+| **Tunnel Location** | Same machine as Docker | Different machine (VPS/NAS) | Same machine = less latency |
+
+**Configuration Matrix:**
+
+| Scenario                               | Cloudflare Tunnel Target         | Caddyfile Domain Syntax        | X-Forwarded-Proto Header | Notes                |
+| -------------------------------------- | -------------------------------- | ------------------------------ | ------------------------ | -------------------- |
+| **Cloudflare TLS + Same Machine**      | `http://localhost:80`            | `http://{$PUBLIC_DOMAIN}`      | `https`                  | Recommended setup    |
+| **Cloudflare TLS + Different Machine** | `http://mac.tailnet.ts.net:80`   | `http://{$PUBLIC_DOMAIN}`      | `https`                  | Tunnel on VPS/laptop |
+| **Caddy TLS** (advanced)               | `https://mac.tailnet.ts.net:443` | `{$PUBLIC_DOMAIN}` (no prefix) | `{http.request.scheme}`  | Caddy manages certs  |
+
+##### Setup: Cloudflare TLS + Same Machine (Recommended)
+
+This setup assumes `cloudflared` runs on the same machine as your Docker containers.
+
+###### 1. Install cloudflared
 
 ```bash
-docker run -d --name caddy -p 80:80 -p 443:443 \
-  -v ~/caddy/Caddyfile:/etc/caddy/Caddyfile \
-  -v caddy_data:/data -v caddy_config:/config caddy:latest
+brew install cloudflare/cloudflare/cloudflared
 ```
 
-``**:**
+###### 2. Authenticate with Cloudflare
 
+```bash
+cloudflared tunnel login
 ```
-immich.example.com {
-  reverse_proxy 127.0.0.1:2283
+
+This opens a browser for authentication and downloads credentials to `~/.cloudflared/`.
+
+###### 3. Create a tunnel
+
+```bash
+cloudflared tunnel create photos-tunnel
+```
+
+Note the tunnel ID shown in the output (e.g., `a1b2c3d4-e5f6-...`).
+
+###### 4. Configure DNS routing
+
+Setup through the web GUI or create `~/.cloudflared/config.yml`:
+
+```yaml
+tunnel: photo-tunnel  # or use the tunnel ID
+credentials-file: /Users/YOUR_USERNAME/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  # Route all public domains to Caddy on localhost:80
+  - hostname: example.com
+    service: http://localhost:80
+  - hostname: prism.example.com
+    service: http://localhost:80
+  - hostname: immich.example.com
+    service: http://localhost:80
+  # Catch-all rule (required)
+  - service: http_status:404
+```
+
+###### 5. Create DNS records
+
+```bash
+cloudflared tunnel route dns photo-tunnel example.com
+cloudflared tunnel route dns photo-tunnel prism.example.com
+cloudflared tunnel route dns photo-tunnel immich.example.com
+```
+
+This creates CNAME records in Cloudflare DNS pointing to your tunnel.
+
+###### 6. Verify Caddyfile settings
+
+Ensure `compose/Caddyfile` uses `http://` prefix for public domains (already configured if using this repo):
+
+```caddy
+# ✅ Correct - prevents auto-redirect to HTTPS
+http://{$PUBLIC_DOMAIN} { ... }
+http://{$PHOTOPRISM_PUBLIC_DOMAIN} { ... }
+http://{$IMMICH_PUBLIC_DOMAIN} { ... }
+
+# ❌ Wrong - would cause redirect loops
+{$PUBLIC_DOMAIN} { ... }  # Caddy auto-redirects to HTTPS
+```
+
+And that `X-Forwarded-Proto` is set to `https` (not `{http.request.scheme}`):
+
+```caddy
+reverse_proxy {env.PHOTOPRISM_UPSTREAM} {
+  header_up X-Forwarded-Proto https  # ✅ Apps generate correct HTTPS URLs
 }
-photoprism.example.com {
-  reverse_proxy 127.0.0.1:2342
-}
 ```
 
-Caddy auto-generates TLS certificates via Let’s Encrypt.
-⚠️ Only open ports 80/443 if you truly need public access.
+###### 7. Update .env
 
-#### Option 2: Tailscale Funnel (Beta)
-For simple external sharing:
-👉 [Tailscale Funnel Documentation](https://tailscale.com/kb/1223/funnel)
+Ensure these are set in `.env`:
+
+```bash
+PUBLIC_DOMAIN=example.com
+IMMICH_PUBLIC_DOMAIN=immich.example.com
+PHOTOPRISM_PUBLIC_DOMAIN=prism.example.com
+```
+
+###### 8. Start the tunnel
+
+```bash
+# Test run (foreground)
+cloudflared tunnel run photo-tunnel
+
+# Install as a service (runs at boot)
+sudo cloudflared service install
+sudo launchctl start com.cloudflare.cloudflared  # macOS
+# or: sudo systemctl start cloudflared  # Linux
+```
+
+###### 9. Restart Caddy
+
+```bash
+make caddy down && make caddy up
+```
+
+###### 10. Verify
+
+- `https://example.com` → Caddy landing page
+- `https://prism.example.com` → PhotoPrism
+- `https://immich.example.com` → Immich
+
+How to Test Caddy is Working
+
+####### Test with the correct Host header (simulates what Cloudflare Tunnel sends):
+
+######## Test landing page
+```sh
+curl -H "Host: example.com" http://localhost
+```
+
+######## Test PhotoPrism route
+```sh
+curl -H "Host: prism.example.com" http://localhost
+```
+
+######## Test Immich route
+```sh
+curl -H "Host: immich.example.com" http://localhost
+```
+
+####### Test with your actual Tailscale hostname (if certs are set up):
+```sh
+curl -I https://desktop.tail349f91.ts.net
+```
+
+####### Once Cloudflare Tunnel is configured, test the actual public URLs:
+
+curl -I https://example.com
+curl -I https://prism.example.com
+curl -I https://immich.example.com
+
+###### Why This Design is Correct
+
+Cloudflare Tunnel sends requests to http://localhost:80 but preserves the original Host header (e.g., Host: prism.example.com).
+Caddy uses that Host header to match the correct block and route appropriately.
+
+So the 308 redirect you're seeing is actually expected behavior when accessing http://localhost directly
+
+##### Alternative: Cloudflare TLS + Different Machine
+
+If you want to run `cloudflared` on a different machine (e.g., a VPS or laptop):
+
+**Changes from above:**
+1. In `~/.cloudflared/config.yml`, replace `localhost` with your Tailscale hostname:
+   ```yaml
+   ingress:
+     - hostname: example.com
+       service: http://mac.tailnet.ts.net:80  # Use Tailscale address
+   ```
+
+2. Ensure Tailscale is running on both machines and they can communicate:
+   ```bash
+   ping mac.tailnet.ts.net
+   curl -I http://mac.tailnet.ts.net:80
+   ```
+
+**Trade-offs:**
+- ✅ Flexibility to move services
+- ❌ Extra network hop through Tailscale (slightly higher latency)
+
+##### Why These Settings?
+
+**Q: Why `http://` prefix in Caddyfile?**
+A: Without it, Caddy auto-redirects HTTP → HTTPS. But Cloudflare sends HTTP (it already terminated TLS), causing redirect loops.
+
+**Q: Why `X-Forwarded-Proto: https`?**
+A: PhotoPrism and Immich use this header to generate URLs. Without it, they'd generate `http://` links which fail.
+
+**Q: Why localhost vs Tailscale address?**
+A: If `cloudflared` runs on the same machine as Docker, `localhost` is faster (no Tailscale hop). Use Tailscale address only if tunnel runs elsewhere.
+
+**Q: Why keep ports 2283/2342 exposed?**
+A: Allows direct access within tailnet for troubleshooting and faster access when Caddy features aren't needed. Remove exposure for tighter security if preferred.
+
+#### Public DNS + Caddy (Let’s Encrypt)
+##### Prereqs (public DNS path)
+- Tailscale MagicDNS has been set up (`TS_NODE` in `.env`, e.g. `mac.tailnet.ts.net`)
+- DNS for a domain of your choose (e.g. example.com) is under your control
+- Router or cloud firewall forwards ports `80` & `443` to the host running Caddy
+
+This will go through setting up:
+- A **DigitalOcean Droplet**. Any other VPS of your choosing should work so long as you have root access
+- **Caddy** on the VPS to provide HTTPS your `A` records
+
+No home router port forwarding is needed; only the VPS is publicly exposed.
+
+!!! Note
+  This guide won't be perfect but should get you most of the way.
+
+##### 0. Create a DigitalOcean Droplet
+
+1) **Create Droplet**: 
+   1) Ubuntu 24.04 LTS (x86_64)
+   2) Basic / Regular Intel/AMD, 
+   3) Select the smallest plan (e.g., 1 vCPU / 512 MB RAM)
+
+2) **Region**: pick the closest to you (e.g., NYC/SFO/AMS).
+
+3) **Auth**: add your SSH key (recommended). Disable password login if you can.
+
+4) **Networking**: leave defaults; you’ll add DNS next
+
+5) **Post‑create**: note the Droplet public IP.
+
+##### 1. DNS
+- Create `A` (or `AAAA`) records pointing to your host’s public IP:
+  - `example.com`
+  - `immich.example.com`
+  - `prism.example.com`
+
+!!! Note
+   Keep the records **unproxied** if you later plan to put Cloudflare in front; issue certs first, then enable proxy.
+
+##### 2. Secure the VPS & Install Tailscale
+
+```bash
+# SSH into the Droplet
+ssh root@DROPLET_PUBLIC_IP
+
+# Update & basic hardening
+apt update && apt -y upgrade
+apt -y install ufw curl ca-certificates
+ufw allow OpenSSH
+ufw allow 80,443/tcp
+ufw --force enable
+
+# Install Tailscale and join your tailnet
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up --ssh
+
+# Verify reachability to your home node
+ping -c1 mac.tailnet.ts.net || true
+curl -I http://mac.tailnet.ts.net:2283   # Immich
+curl -I http://mac.tailnet.ts.net:2342   # PhotoPrism
+```
+
+If curl fails, check Tailnet ACLs and that your home services are listening on those ports.
+
+##### 3. Certificates
+- For the Tailnet host (`${TS_NODE}` in .env), grab Tailscale Cert. Docs [Caddy certificates on Tailscale](https://tailscale.com/kb/1190/caddy-certificates#provide-non-root-users-with-access-to-fetch-certificate):
+
+  ```sh
+  chmod +x scripts/renew_tailscale_cert.sh
+  ./scripts/renew_tailscale_cert.sh
+  ```
+- For the public domain, Caddy will request Let’s Encrypt certificates automatically once DNS resolves and ports 80/443 reach the host (no additional command needed).
+- Optional: install launch agent for cert renewal
+  ```sh
+  chmod +x scripts/setup_renew_tailscale_cert_launch_agent.sh
+  ./scripts/setup_renew_tailscale_cert_launch_agent.sh
+  launchctl load ~/Library/LaunchAgents/com.user.tailscale-cert.plist
+  ```
+
+##### 4. Caddyfile + env
+- Copy/clone this repo on the droplet (or manually install Caddy and copy the Caddyfle)
+- Update `.env` to include
+  ```dotenv
+  PUBLIC_DOMAIN=example.com
+  IMMICH_PUBLIC_DOMAIN=immich.example.com
+  PHOTOPRISM_PUBLIC_DOMAIN=prism.example.com
+  ```
+- Update `PHOTOPRISM_UPSTREAM` and `IMMICH_UPSTREAM` in `.env` to point to the correct host, since they are no longer on the same machine as Caddy
+- Create the runtime file that Caddy mounts (`CADDY_CERTS_DIR` and `CADDYFILE_TARGET` in .env):
+  ```sh
+  mkdir -p ~/caddy/certs
+  cp Caddyfile.example ~/caddy/Caddyfile
+  ``` 
+- Optional: link to Caddyfile in the compose/ dir if you want it to be scooped up by the backup script. `compose/Caddyfile` is gitignored
+  ```sh
+  ln ~/caddy/Caddyfile compose/Caddyfile
+  ```
+
+##### 5. One-time Docker network (if running on the same machine)
+```sh
+docker network create photo_net
+```
+
+##### 6. Restart services
+```bash
+make photoprism down && make photoprism up && make photoprism logs follow
+make immich down && make immich up && make immich logs follow
+make caddy pull   # optional: fetch latest image
+make caddy down && make caddy up && make caddy logs follow
+```
+
+##### 7. Verify
+- `https://prism.example.com/` → PhotoPrism (dedicated subdomain)
+- `https://immich.example.com/` → Immich (still requires its own host)
+
+#### Alternatives Considered/Explored
+##### Tailscale-only Stack with Custom Domains
+- Base Tailscale alone is not sufficient because 
+    - It doesn't support subdomains (i.e. immich.mac.tailnet.ts.net) on nodes
+    - Immich doesn't support subpaths (i.e. mac.tailnet.ts.net/immich), although Photoprism does
+- Tailscale Serve / Tunnel are not viable because 
+    - They only allow you to expose one service per node. We'd want at least two to directly expose both Immich and Photoprism
+    - Can't work around the one-service limitation by using Caddy as the single service that handles routing to the others because Tailscale Funnel doesn't support custom domains. Citations: 
+        - [🚀 Challenge: Tailscale Funnel with a Custom Domain + Nginx Proxy Manager. Mission Impossible? · NginxProxyManager nginx-proxy-manager](https://github.com/NginxProxyManager/nginx-proxy-manager/discussions/4743)
+        - [Funnel with own domain name?](https://www.reddit.com/r/Tailscale/comments/10t0rde/funnel_with_own_domain_name/)
+        - [FR: Allow custom domains for Tailscale Funnel](https://github.com/tailscale/tailscale/issues/11563) - still open at the time of writing this
+
+##### NearlyFreeSpeech.NET (NFSN) as the VPS for Caddy
+- NearlyFreeSpeech.Net (NFSN), as a shared/“jailed” VPS host, doesn’t offer enough control over the system to properly run Tailscale. Essentially, you can only use VPSs that enable root access
+
+##### Port-Fordwarding On Home Router Instead Of Running On A VPS 
+- You could always enable port forwarding of 80 and 443 on your home network, but that’s not worth the risks.
+- Pros: 
+    - No additional cost 
+    - No additional latency for internal service communication
+- Cons
+    - Increased attack surface area (as in, your whole home network) for vulnerabilities and DDOS
 
 ## 🧰 Quick Recovery
 
-| Task.                   | Comma                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| Rebuild Immich          | `docker compose --env-file .env -f immich.yml up -d --build`                                           |
-| Rebuild PhotoPrism      | `docker compose --env-file .env -f photoprism.yml up -d --build`                                       |
-| Restart all             | `make down && makup up`                                                                                |
-| Stop all                | `make down`                                                                                            |
-| Backup DBs              | `docker compose --env-file .env -f immich.yml exec immich-db pg_dumpall -U immich > immich_backup.sql` |
-| Update images & restart | `make pull && make up`                                                                                 |
-|                         | `make immich pull && make immich up`                                                                   |
-|                         | `make photoprism pull && make photoprism up`                                                           |
+| Task.                   | Command                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rebuild Immich          | `docker compose --env-file .env -f immich.yml up -d --build`                                                                                           |
+| Rebuild PhotoPrism      | `docker compose --env-file .env -f photoprism.yml up -d --build`                                                                                       |
+| Restart all             | `make down && makup up`                                                                                                                                |
+| Stop all                | `make down`                                                                                                                                            |
+| Backup DBs              | `docker compose --env-file .env -f immich.yml exec immich-db pg_dumpall -U immich > immich_backup.sql`                                                 |
+| Update images & restart | `make pull && make up`                                                                                                                                 |
+|                         | `make immich pull && make immich up`                                                                                                                   |
+|                         | `make photoprism pull && make photoprism up`                                                                                                           |
+| Check launch agents     | tail ~/Library/Logs/photo-mount-error.log ~/Library/Logs/photo-mount.log ~/Library/Logs/photo-backup-dbs-error.log ~/Library/Logs/photo-backup-dbs.log |
 
 ## 📚 References
 

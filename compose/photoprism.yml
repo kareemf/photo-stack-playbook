@@ -20,8 +20,11 @@
 # CLI Commands:
 # - https://docs.photoprism.app/getting-started/docker-compose/#command-line-interface
 
+name: photostack
+
 services:
   photoprism:
+    container_name: photoprism
     ## Use photoprism/photoprism:preview for testing preview builds:
     image: photoprism/photoprism:latest
     ## Don't enable automatic restarts until PhotoPrism has been properly configured and tested!
@@ -46,9 +49,16 @@ services:
       PHOTOPRISM_AUTH_MODE: "password"               # authentication mode (public, password)
       PHOTOPRISM_DEFAULT_LOCALE: "en"                # default user interface language, e.g. "en" or "de"
       PHOTOPRISM_PLACES_LOCALE: "local"              # location details language, e.g. "local", "en", or "de"
-      PHOTOPRISM_SITE_URL: "http://localhost:2342/"  # server URL in the format "http(s)://domain.name(:port)/(path)"
-      PHOTOPRISM_DISABLE_TLS: "false"                # disables HTTPS/TLS even if the site URL starts with https:// and a certificate is available
-      PHOTOPRISM_DEFAULT_TLS: "true"                 # defaults to a self-signed HTTPS/TLS certificate if no other certificate is available
+      # !! Use locahost if you aren't running a reverse proxy (Caddy, Funnel, etc)
+      # PHOTOPRISM_SITE_URL: "http://localhost:2342/"  # external URL routed through Caddy
+      # When fronted by Caddy, point to the public Photoprism domain
+      PHOTOPRISM_SITE_URL: "https://${PHOTOPRISM_PUBLIC_DOMAIN}/"
+      # !! Use true if TLS is handled by Caddy. Otherwise false
+      # PHOTOPRISM_DISABLE_TLS: "false"               #
+      PHOTOPRISM_DISABLE_TLS: "true"                  # TLS terminated by Caddy
+      # !! Use false if TLS is handled by Caddy. Otherwise true
+      # PHOTOPRISM_DEFAULT_TLS: "true"                 # disable self-signed TLS because proxy handles HTTPS
+      PHOTOPRISM_DEFAULT_TLS: "false"                 # disable self-signed TLS because proxy handles HTTPS
       PHOTOPRISM_HTTP_COMPRESSION: "gzip"            # improves transfer speed and bandwidth utilization (none or gzip)
       PHOTOPRISM_LOG_LEVEL: "info"                   # log level: trace, debug, info, warning, or error
       PHOTOPRISM_READONLY: "false"                   # do not modify originals directory (reduced functionality)
@@ -101,6 +111,7 @@ services:
   ## MariaDB Database Server (recommended)
   ## see https://docs.photoprism.app/getting-started/faq/#should-i-use-sqlite-mariadb-or-mysql
   mariadb:
+    container_name: photoprism_db
     image: mariadb:11
     restart: unless-stopped
     stop_grace_period: 15s
@@ -138,3 +149,8 @@ services:
 volumes:
   database:
     driver: local
+
+networks:
+  default:
+    name: photo_net
+    external: true
