@@ -114,7 +114,8 @@ mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage,cache},immi
 
 ...or do it manually
 
-!!! Gotcha: Keep Immich read-only on /photos/originals to avoid metadata clashes
+!!! Note
+  Potential Gotcha: Keep Immich read-only on /photos/originals to avoid metadata clashes
 
 ### Persistent Mount of NAS on Mac
 
@@ -150,7 +151,7 @@ Disable with `launchctl unload ~/Library/LaunchAgents/com.user.photo-mount.plist
  
 *(See the `compose/` directory for full definitions.)*
 
-#### Makefile Helpers
+#### FYI: Makefile Helpers
 Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or both:
 
 ```bash
@@ -172,7 +173,8 @@ make photoprism logs
 make logs # Aggregated tail logs for both stacks (tail=100, follow)
 ```
 
-Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. Override `ENV_FILE`, `STACK`, or `TAIL` on the command line if needed (e.g. `make STACK=immich TAIL=200 logs`).
+Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. 
+Override `ENV_FILE`, `STACK`, or `TAIL` on the command line if needed (e.g. `make STACK=immich TAIL=200 logs`).
 
 
 💡 Handy commands once everything is up and running
@@ -199,14 +201,48 @@ make photoprism up
 
 ```sh
 docker ps
+```
+
+```sh
+make logs
+```
+
+OR
+
+```sh
 docker compose --env-file .env -f compose/immich.yml logs -f --tail=100 immich-server
 docker compose --env-file .env -f compose/photoprism.yml logs -f --tail=100 photoprism
 ```
 
+!!! Note
+  You might see `Error: connect ECONNREFUSED 172.18.0.4:5432` from `immich_server` in the logs initally. This is normal while containers are still starting up
+ 
 #### Addresses
 
 PhotoPrism should be available at http://127.0.0.1:2342/
 Immich should be available at http://127.0.0.1:2283/
+
+### Immich: Import Read-Only Library
+Official docs: https://docs.immich.app/features/libraries/
+
+#### Add library
+* Login. 
+* Go to http://localhost:2283/admin/library-management
+* Add `/originals` when asked for the path, which should line up with the volume mounted in immich.yml (`${NAS_MOUNT_POINT}/originals:/originals:ro`)
+* Hit Validate
+* Hit Save
+
+#### Exclude RAWs
+
+> We don't want to import the raw files to Immich
+ Official docs: https://docs.immich.app/features/libraries/
+  
+* Menu -> Scan Settings -> Add exlusion pattern
+* Add: `**/*.{arw,cr2,cr3,dng,nef,orf,pef,raf,rw2,srw}`
+* Hit Save
+
+!!! Note
+  If you add additional volumes, expose them to both `immich-server` and `database`
 
 ### Staggered First-Run Indexing
 
