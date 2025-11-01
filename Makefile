@@ -1,4 +1,4 @@
-.PHONY: up down logs immich photoprism both
+.PHONY: up down pull logs immich photoprism both
 
 STACK ?= both
 STACK_TARGETS := immich photoprism both
@@ -35,6 +35,10 @@ up:
 down:
 	@echo "Stopping $(STACK) stack..."
 	@$(call compose_with,$(COMPOSE_FILES)) down
+
+pull:
+	@echo "Pulling images for $(STACK) stack..."
+	@$(call compose_with,$(COMPOSE_FILES)) pull
 
 logs:
 	@echo "Tailing logs for $(STACK) stack..."

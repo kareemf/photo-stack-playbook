@@ -47,13 +47,13 @@ graph TD
 
 ### 🧩 Summary Table
 
-| Task           | Tool       | Host     | Notes                    |
-| -------------- | ---------- | -------- | ------------------------ |
-| Auto uploads   | Immich     | Mac | Mobile → NAS             |
-| Metadata management  | PhotoPrism | NAS      | XMP + tagging            |
-| Private access | Tailscale  | All      | Encrypted mesh VPN       |
-| Public sharing | Caddy      | Mac | HTTPS + domain           |
-| Weekly backup  | launchd    | Mac | To NAS `/photos/backups` |
+| Task                | Tool       | Host | Notes                    |
+| ------------------- | ---------- | ---- | ------------------------ |
+| Auto uploads        | Immich     | Mac  | Mobile → NAS             |
+| Metadata management | PhotoPrism | NAS  | XMP + tagging            |
+| Private access      | Tailscale  | All  | Encrypted mesh VPN       |
+| Public sharing      | Caddy      | Mac  | HTTPS + domain           |
+| Weekly backup       | launchd    | Mac  | To NAS `/photos/backups` |
 
 ## 📂 Repository Structure
 
@@ -158,14 +158,18 @@ make up # Start both stacks
 make immich up
 make photoprism up
 
+make pull # Refresh images for both stacks
+make immich pull
+make photoprism pull
+
 make down # Stop both stacks
 make immich down
 make photoprism down
 
-make logs # Aggregated tail logs for both stacks
 make logs follow
 make immich logs
 make photoprism logs
+make logs # Aggregated tail logs for both stacks (tail=100, follow)
 ```
 
 Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. Override `ENV_FILE`, `STACK`, or `TAIL` on the command line if needed (e.g. `make STACK=immich TAIL=200 logs`).
@@ -183,12 +187,12 @@ make photoprism down && make photoprism up && make photoprism logs follow
 #### Manual Commands
 ```bash
 # Start Immich (Mac mini)
-docker compose --env-file .env -f compose/immich.yml pull
-docker compose --env-file .env -f compose/immich.yml up -d
+make immich pull
+make immich up
 
 # Start PhotoPrism (NAS or Mac)
-docker compose --env-file .env -f compose/photoprism.yml pull
-docker compose --env-file .env -f compose/photoprism.yml up -d
+make photoprism pull
+make photoprism up
 ```
 
 #### Check Container Logs and Health
@@ -319,15 +323,16 @@ For simple external sharing:
 
 ## 🧰 Quick Recovery
 
-| Task.              |  Comma                                                           |
-| ------------------ | ---------------------------------------------------------------- |
-| Rebuild Immich     | `docker compose --env-file .env -f immich.yml up -d --build`                     |
-| Rebuild PhotoPrism | `docker compose --env-file .env -f photoprism.yml up -d --build`                 |
-| Restart all           | `docker restart immich-server photoprism`                           |
-| Stop all              | `docker stop immich-server photoprism`                           |
-| Backup DBs         | `docker exec immich-db pg_dumpall -U immich > immich_backup.sql` |
-| Update images & restart      | `docker compose --env-file .env -f immich.yml pull && docker compose --env-file .env -f immich.yml up -d`                    |
-|                    | `docker compose --env-file .env -f photoprism.yml pull && docker compose --env-file .env -f photoprism.yml up -d`                    |
+| Task.                   | Comma                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| Rebuild Immich          | `docker compose --env-file .env -f immich.yml up -d --build`                                           |
+| Rebuild PhotoPrism      | `docker compose --env-file .env -f photoprism.yml up -d --build`                                       |
+| Restart all             | `make down && makup up`                                                                                |
+| Stop all                | `make down`                                                                                            |
+| Backup DBs              | `docker compose --env-file .env -f immich.yml exec immich-db pg_dumpall -U immich > immich_backup.sql` |
+| Update images & restart | `make pull && make up`                                                                                 |
+|                         | `make immich pull && make immich up`                                                                   |
+|                         | `make photoprism pull && make photoprism up`                                                           |
 
 ## 📚 References
 
