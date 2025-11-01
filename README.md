@@ -62,10 +62,13 @@ photo-stack/
 ├── compose/
 │   ├── immich.yml
 │   └── photoprism.yml
+│   └── caddy.yml
 ├── scripts/
 │   └── setup_nas_mount.sh
 │   └── setup_backup_launch_agent.sh
 │   └── backup_photo_dbs.sh
+│   └── ...
+├── Caddyfile.example
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -108,8 +111,10 @@ ln -s .env compose/.env
 
 ### Setup NAS Directories 
 
+On your storage device
+
 ```sh
-mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage,cache},immich/thumbs}
+mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage},immich,backups}
 ```
 
 ...or do it manually
@@ -152,7 +157,7 @@ Disable with `launchctl unload ~/Library/LaunchAgents/com.user.photo-mount.plist
 *(See the `compose/` directory for full definitions.)*
 
 #### FYI: Makefile Helpers
-Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or both:
+Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or Caddy:
 
 ```bash
 make up # Start both stacks
@@ -306,9 +311,9 @@ Use `./scripts/setup_backup_launch_agent.sh --help` to see override options.
 
 ---
 
-## 🔐 Secure Remote Access
+## 🔐 Secure Remote Access + Pretty Names
 
-### 🔐 Tailscale (Recommended)
+### 🔐 Tailscale
 
 Use **Tailscale** for private, end-to-end encrypted access to your stack without port forwarding.
 
@@ -325,50 +330,64 @@ Typical access pattern:
 Use [Access Control Lists (ACLs)](https://tailscale.com/kb/1018/acls)[ss Control Lists (ACLs)](https://tailscale.com/kb/1018/acls) to restrict access by user or device.
 For secure collaboration, grant Tailnet access to trusted family devices only.
 
----
+### Pretty Names
+
+Rereqs
+- Tailscale has been setup
+- `TS_NODE` in .env has been updated
+
+Create `CADDY_CERTS_DIR` and `CADDYFILE_TARGET`
+
+```sh
+mkdir -p ~/caddy/{certs} && cp Caddyfile.example ~/caddy/Caddyfile
+```
+
+Grab Tailscale Cert. Docs [Caddy certificates on Tailscale
+](https://tailscale.com/kb/1190/caddy-certificates#provide-non-root-users-with-access-to-fetch-certificate)
+
+```sh
+chmod +x scripts/renew_tailscale_cert.sh
+./scripts/renew_tailscale_cert.sh 
+```
+
+Optional: link to Caddyfile in the compose/ dir if you want it to be scooped up by the backup script. `compose/Caddyfile` is gitignored
+
+```sh
+ln ~/caddy/Caddyfile compose/Caddyfile
+```
+
+Bring the proxy online with the Makefile helpers:
+
+```sh
+make caddy pull   # optional: fetch latest image
+make caddy down && make caddy up && make caddy logs
+```
+
+Optional: install launch agent for cert renewal
+
+```sh
+chmod +x scripts/setup_renew_tailscale_cert_launch_agent.sh
+./scripts/setup_renew_tailscale_cert_launch_agent.sh
+launchctl load ~/Library/LaunchAgents/com.user.tailscale-cert.plist
+```
 
 ### 🌍 Sharing with Non-Tailnet Users
 
-If friends/family don’t use Tailscale, use a **reverse proxy** for public HTTPS access.
-
-#### Option 1: Caddy
-
-```bash
-docker run -d --name caddy -p 80:80 -p 443:443 \
-  -v ~/caddy/Caddyfile:/etc/caddy/Caddyfile \
-  -v caddy_data:/data -v caddy_config:/config caddy:latest
-```
-
-``**:**
-
-```
-immich.example.com {
-  reverse_proxy 127.0.0.1:2283
-}
-photoprism.example.com {
-  reverse_proxy 127.0.0.1:2342
-}
-```
-
-Caddy auto-generates TLS certificates via Let’s Encrypt.
-⚠️ Only open ports 80/443 if you truly need public access.
-
-#### Option 2: Tailscale Funnel (Beta)
-For simple external sharing:
-👉 [Tailscale Funnel Documentation](https://tailscale.com/kb/1223/funnel)
+TODO
 
 ## 🧰 Quick Recovery
 
-| Task.                   | Comma                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| Rebuild Immich          | `docker compose --env-file .env -f immich.yml up -d --build`                                           |
-| Rebuild PhotoPrism      | `docker compose --env-file .env -f photoprism.yml up -d --build`                                       |
-| Restart all             | `make down && makup up`                                                                                |
-| Stop all                | `make down`                                                                                            |
-| Backup DBs              | `docker compose --env-file .env -f immich.yml exec immich-db pg_dumpall -U immich > immich_backup.sql` |
-| Update images & restart | `make pull && make up`                                                                                 |
-|                         | `make immich pull && make immich up`                                                                   |
-|                         | `make photoprism pull && make photoprism up`                                                           |
+| Task.                   | Command                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rebuild Immich          | `docker compose --env-file .env -f immich.yml up -d --build`                                                                                           |
+| Rebuild PhotoPrism      | `docker compose --env-file .env -f photoprism.yml up -d --build`                                                                                       |
+| Restart all             | `make down && makup up`                                                                                                                                |
+| Stop all                | `make down`                                                                                                                                            |
+| Backup DBs              | `docker compose --env-file .env -f immich.yml exec immich-db pg_dumpall -U immich > immich_backup.sql`                                                 |
+| Update images & restart | `make pull && make up`                                                                                                                                 |
+|                         | `make immich pull && make immich up`                                                                                                                   |
+|                         | `make photoprism pull && make photoprism up`                                                                                                           |
+| Check launch agents     | tail ~/Library/Logs/photo-mount-error.log ~/Library/Logs/photo-mount.log ~/Library/Logs/photo-backup-dbs-error.log ~/Library/Logs/photo-backup-dbs.log |
 
 ## 📚 References
 
