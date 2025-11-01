@@ -138,3 +138,8 @@ services:
 volumes:
   database:
     driver: local
+
+networks:
+  default:
+    name: photo_net
+    external: true

@@ -6,13 +6,13 @@
   # Immich under /immich
   handle_path /immich/* {
     uri strip_prefix /immich
-    reverse_proxy {$IMMICH_UPSTREAM}
+    reverse_proxy http://immich:2283
   }
 
   # PhotoPrism under /prism
   handle_path /prism/* {
     uri strip_prefix /prism
-    reverse_proxy {$PHOTOPRISM_UPSTREAM}
+    reverse_proxy http://photoprism:2342
   }
 
   @root path /

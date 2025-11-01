@@ -336,6 +336,13 @@ Rereqs
 - Tailscale has been setup
 - `TS_NODE` in .env has been updated
 
+
+Run once on the host:
+
+```bash
+docker network create photo_net
+```
+
 Create `CADDY_CERTS_DIR` and `CADDYFILE_TARGET`
 
 ```sh
@@ -356,11 +363,13 @@ Optional: link to Caddyfile in the compose/ dir if you want it to be scooped up 
 ln ~/caddy/Caddyfile compose/Caddyfile
 ```
 
-Bring the proxy online with the Makefile helpers:
+Restart the stack and bring the Caddy proxy online
 
 ```sh
-make caddy pull   # optional: fetch latest image
-make caddy down && make caddy up && make caddy logs
+make caddy pull
+make down
+make up
+make logs
 ```
 
 Optional: install launch agent for cert renewal
