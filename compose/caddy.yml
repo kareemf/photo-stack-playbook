@@ -8,16 +8,14 @@ services:
       - "${CADDY_HTTPS_PORT:-443}:443"
     environment:
       TS_NODE: "${TS_NODE}"
-      IMMICH_UPSTREAM: "immich:2283}"
-      PHOTOPRISM_UPSTREAM: "photoprism:2342}"
+      IMMICH_UPSTREAM: "${IMMICH_UPSTREAM}"
+      PHOTOPRISM_UPSTREAM: "${PHOTOPRISM_UPSTREAM}"
     volumes:
       - "${CADDYFILE_TARGET:-./compose/Caddyfile}:/etc/caddy/Caddyfile:ro"
       # Tailscale certs directory on the host; certs named ${TS_NODE}.crt/.key
       - "${CADDY_CERTS_DIR:-$HOME/caddy/certs}:/etc/certs:ro"
       - caddy_data:/data
       - caddy_config:/config
-    networks:
-      - photo_net
 
 volumes:
   caddy_data:

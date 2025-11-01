@@ -363,14 +363,16 @@ Optional: link to Caddyfile in the compose/ dir if you want it to be scooped up 
 ln ~/caddy/Caddyfile compose/Caddyfile
 ```
 
-Restart the stack and bring the Caddy proxy online
+Bring the Caddy proxy online with the Makefile helpers (keeps the `.env` wiring consistent):
 
 ```sh
-make caddy pull
 make down
 make up
 make logs
+make caddy pull   # optional: fetch latest image
 ```
+
+By default the `.env` file points `IMMICH_UPSTREAM` to `immich_server:2283` and `PHOTOPRISM_UPSTREAM` to `photoprism:2342`, matching the Compose service hostnames on `photo_net`. Change those values if the apps run on other hosts (for example, another Tailscale node).
 
 Optional: install launch agent for cert renewal
 

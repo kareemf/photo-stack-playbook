@@ -6,13 +6,21 @@
   # Immich under /immich
   handle_path /immich/* {
     uri strip_prefix /immich
-    reverse_proxy http://immich:2283
+    reverse_proxy {env.IMMICH_UPSTREAM} {
+      header_up Host {http.request.host}
+    }
   }
 
   # PhotoPrism under /prism
-  handle_path /prism/* {
-    uri strip_prefix /prism
-    reverse_proxy http://photoprism:2342
+  handle /prism {
+    redir /prism/ 302
+  }
+
+  @prism path /prism/*
+  handle @prism {
+    reverse_proxy {env.PHOTOPRISM_UPSTREAM} {
+      header_up Host {http.request.host}
+    }
   }
 
   @root path /
