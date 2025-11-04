@@ -83,30 +83,43 @@ Subject to change but hopefully helpful overview
 ├── originals/                 # Main library (RAW/JPG/Video)
 ├── uploads/
 │   ├── from-immich/           # Mobile auto-upload inbox
-├── photoprism/                # PP cache + sidecars
-│   ├── storage/
-├── immich/                    # Immich DB
-│   └── postgres/
 └── backups/                   # DB and config backups
     ├── immich/
     └── photoprism/
 ```
 
+On the host machine
+```
+~/
+├── photoprism/                # PP DB + sidecars
+│   ├── storage/
+├── immich/                    # Immich DB
+│   └── postgres/
+```
 
 ## 🧮 Setup Instructions
 
-### Clone repo
+### Clone Repo
 
 ```sh
 git clone git@github.com:kareemf/photo-stack-playbook.git
 cd photo-stack-playbook
 ```
 
-### Create .env file
+### Create .env File
 
 ```sh
 cp .env.example .env
 ln -s .env compose/.env
+```
+
+### Create Local Database Directories
+
+On the host machine storage device
+
+```sh
+mkdir -p ~/photoprism/{storage}
+mkdir -p ~/immich/{postgres}
 ```
 
 ### Setup NAS Directories 
@@ -191,6 +204,11 @@ make immich down && make immich up && make immich logs follow
 make photoprism down && make photoprism up && make photoprism logs follow
 ```
 
+```sh
+make photoprism index          # runs photoprism index --cleanup
+make photoprism index force    # includes --force for a full reindex
+```
+
 #### Manual Commands
 ```bash
 # Start Immich (Mac mini)
@@ -249,14 +267,32 @@ Official docs: https://docs.immich.app/features/libraries/
 !!! Note
   If you add additional volumes, expose them to both `immich-server` and `database`
 
+
+### Photoprism: Performance Considerations & Troubleshooting
+#### Empty index after restart
+- Keep `/photoprism/storage` (which holds the DB, thumbsnails, sidecars, etc.) on local disk (ideally SSD) instead of NAS
+  - Impact: If storage isn’t mounted to a persistent volume, PhotoPrism may come up with a fresh, empty index after a container update or restart. Docs [discourage NAS storage](https://docs.photoprism.app/getting-started/troubleshooting/performance/?utm_source=chatgpt.com#storage)
+
+#### Only partially indexing (sometimes not indexing subfolders)
+- Increase Docker resources available to docker (Cores, RAM, and Swap)
+- Mount NAS drives via NFS instead of SMB
+  - More stable and performant during indexation
+- Possible red herring: Use the “Library → Index” view as source of truth.
+
+
 ### Staggered First-Run Indexing
 
+Run PhotoPrism indexing first
 ```sh
-# Run PhotoPrism indexing first
-docker compose --env-file .env -f compose/photoprism.yml exec photoprism photoprism index
+make photoprism index
+```
+or
+```sh
+docker compose --env-file .env -f compose/photoprism.yml exec photoprism photoprism index --cleanup
+```
 
-# Then let Immich scan (it auto-indexes on start;
-# if needed, restart after PP completes)
+Then let Immich scan (it auto-indexes on start; if needed, restart after PP completes)
+```sh
 docker compose --env-file .env -f compose/immich.yml restart immich-server
 ```
 

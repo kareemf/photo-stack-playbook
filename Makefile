@@ -1,4 +1,4 @@
-.PHONY: up down pull logs immich photoprism all caddy follow
+.PHONY: up down pull logs index immich photoprism all caddy follow force
 
 STACK ?= all
 STACK_TARGETS := immich photoprism all caddy
@@ -45,8 +45,24 @@ logs:
 	@echo "Tailing logs for $(STACK) stack..."
 	@$(call compose_with,$(COMPOSE_FILES)) logs --tail=$(TAIL) $(FOLLOW)
 
+index:
+	@if [ "$(STACK)" != "photoprism" ]; then \
+		echo "Error: index target is only supported for the photoprism stack."; \
+		exit 1; \
+	fi
+	@extra="$(filter force,$(MAKECMDGOALS))"; \
+	cmd="photoprism index --cleanup"; \
+	if [ -n "$$extra" ]; then \
+		cmd="$$cmd --force"; \
+	fi; \
+	echo "Running PhotoPrism indexing command: $$cmd"; \
+	$(call compose_with,$(COMPOSE_FILES)) exec photoprism $$cmd
+
 immich photoprism all caddy:
 	@true
 
 follow:
+	@true
+
+force:
 	@true
