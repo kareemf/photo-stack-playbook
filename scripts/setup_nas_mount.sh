@@ -6,11 +6,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$PROJECT_ROOT/.env"
 
 DRY_RUN=0
+USE_AUTOFS=0
 
 usage() {
   cat <<'USAGE'
-Usage: setup_nas_mount.sh [--dry-run]
-  --dry-run   Show actions without making changes
+Usage: setup_nas_mount.sh [--dry-run] [--autofs]
+  --dry-run     Show actions without making changes
+  --autofs      Configure macOS autofs for the mount (requires sudo)
 USAGE
 }
 
@@ -18,6 +20,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)
       DRY_RUN=1
+      shift
+      ;;
+    --autofs)
+      USE_AUTOFS=1
       shift
       ;;
     -h|--help)
@@ -33,7 +39,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ ! -f "$ENV_FILE" ]; then
-  echo "Missing $ENV_FILE with NAS credentials." >&2
+  echo "Missing $ENV_FILE with NAS settings." >&2
   exit 1
 fi
 
@@ -41,47 +47,68 @@ set -a
 source "$ENV_FILE"
 set +a
 
-for var in NAS_USER NAS_USERPASS NAS_HOST; do
+for var in NAS_HOST NAS_NFS_EXPORT; do
   if [ -z "${!var:-}" ]; then
     echo "Missing $var in $ENV_FILE." >&2
     exit 1
   fi
 done
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required for credential encoding." >&2
-  exit 1
-fi
-
-urlencode() {
-  local value="$1"
-  local safe_chars="${2:-}"
-  python3 -c 'import sys, urllib.parse as p; print(p.quote(sys.argv[1], safe=sys.argv[2]))' "$value" "$safe_chars"
-}
-
-NAS_SHARE="${NAS_SHARE:-photos}"
 MOUNT_POINT="${NAS_MOUNT_POINT:-/Volumes/Photos}"
-FILE_MODE="${SMB_FILE_MODE:-0664}"
-DIR_MODE="${SMB_DIR_MODE:-0775}"
-
-NAS_USER_ESC="$(urlencode "$NAS_USER")"
-NAS_PASS_ESC="$(urlencode "$NAS_USERPASS")"
-NAS_SHARE_ESC="$(urlencode "$NAS_SHARE" "/")"
-SMB_URL="//${NAS_USER_ESC}:${NAS_PASS_ESC}@${NAS_HOST}/${NAS_SHARE_ESC}"
-SMB_URL_REDACTED="//${NAS_USER_ESC}:********@${NAS_HOST}/${NAS_SHARE_ESC}"
+NFS_OPTIONS="${NFS_MOUNT_OPTIONS:-vers=3,resvport,rw,hard,intr,tcp}"
+NFS_TARGET="${NAS_HOST}:${NAS_NFS_EXPORT}"
 
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '[dry-run] mkdir -p %q\n' "$MOUNT_POINT"
 else
   if ! mkdir -p "$MOUNT_POINT" 2>/dev/null; then
-    echo "Failed to create mount point $MOUNT_POINT. Ensure the parent directory is writable or set NAS_MOUNT_POINT in .env." >&2
+    echo "Failed to create mount point $MOUNT_POINT. Adjust permissions or set NAS_MOUNT_POINT." >&2
     exit 1
   fi
 fi
 
 if [ ! -w "$MOUNT_POINT" ]; then
-  echo "Mount point $MOUNT_POINT is not writable by $(whoami). Adjust ownership or choose a different NAS_MOUNT_POINT." >&2
+  echo "Mount point $MOUNT_POINT is not writable by $(whoami)." >&2
   exit 1
+fi
+
+if [ "$USE_AUTOFS" -eq 1 ]; then
+  AUTO_MASTER_D="/etc/auto_master.d"
+  MAP_NAME="auto_photo_stack"
+  MAP_FILE="/etc/${MAP_NAME}"
+  MASTER_SNIPPET="${AUTO_MASTER_D}/photo-stack.autofs"
+  MAP_ENTRY="${MOUNT_POINT} -fstype=nfs,${NFS_OPTIONS} ${NFS_TARGET}"
+
+  echo "Configuring autofs (requires sudo)..."
+  if [ "$DRY_RUN" -eq 1 ]; then
+    cat <<EOF
+[dry-run] sudo install -d ${AUTO_MASTER_D}
+[dry-run] echo "${MAP_ENTRY}" | sudo tee ${MAP_FILE}
+[dry-run] echo "/- ${MAP_FILE}" | sudo tee ${MASTER_SNIPPET}
+[dry-run] sudo automount -cv
+EOF
+    exit 0
+  fi
+
+  if mount | grep -F " on ${MOUNT_POINT} (" >/dev/null; then
+    echo "Unmounting current mount at $MOUNT_POINT..."
+    sudo umount "$MOUNT_POINT" || {
+      echo "Failed to unmount $MOUNT_POINT. Ensure it is not in use." >&2
+      exit 1
+    }
+  fi
+
+  if [ ! -d "$AUTO_MASTER_D" ]; then
+    sudo install -d "$AUTO_MASTER_D"
+  fi
+
+  echo "$MAP_ENTRY" | sudo tee "$MAP_FILE" >/dev/null
+  echo "/- $MAP_FILE" | sudo tee "$MASTER_SNIPPET" >/dev/null
+  sudo automount -cv >/dev/null
+
+  echo "autofs configured. Access $MOUNT_POINT to trigger the mount."
+  ls "$MOUNT_POINT" >/dev/null 2>&1 || true
+  exit 0
 fi
 
 if mount | grep -F " on ${MOUNT_POINT} (" >/dev/null; then
@@ -89,15 +116,16 @@ if mount | grep -F " on ${MOUNT_POINT} (" >/dev/null; then
   exit 0
 fi
 
-echo "Mounting SMB share for immediate use..."
+echo "Mounting NFS share using NFSv3..."
 if [ "$DRY_RUN" -eq 1 ]; then
-  printf '[dry-run] mount_smbfs -f %s -d %s %s %q\n' "${FILE_MODE}" "${DIR_MODE}" "${SMB_URL_REDACTED}" "$MOUNT_POINT"
-else
-  if ! mount_smbfs -f "${FILE_MODE}" -d "${DIR_MODE}" "${SMB_URL}" "$MOUNT_POINT"; then
-    echo "mount_smbfs failed. Verify credentials and NAS_MOUNT_POINT." >&2
-    exit 1
-  fi
+  printf '[dry-run] sudo mount -t nfs -o %s %s %q\n' "$NFS_OPTIONS" "$NFS_TARGET" "$MOUNT_POINT"
+  exit 0
 fi
 
-echo "Mounted ${SMB_URL_REDACTED} at $MOUNT_POINT"
-echo "Unmount with: umount \"$MOUNT_POINT\""
+if ! sudo mount -t nfs -o "$NFS_OPTIONS" "$NFS_TARGET" "$MOUNT_POINT"; then
+  echo "mount -t nfs failed. Verify NAS_NFS_EXPORT and NAS_MOUNT_POINT." >&2
+  exit 1
+fi
+
+echo "Mounted ${NFS_TARGET} at $MOUNT_POINT"
+echo "Unmount with: sudo umount \"$MOUNT_POINT\""

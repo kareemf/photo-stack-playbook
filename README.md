@@ -118,8 +118,8 @@ ln -s .env compose/.env
 On the host machine storage device
 
 ```sh
-mkdir -p ~/photoprism/{storage}
-mkdir -p ~/immich/{postgres}
+mkdir -p ~/photoprism/
+mkdir -p ~/immich/
 ```
 
 ### Setup NAS Directories 
@@ -137,33 +137,52 @@ mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage},immich,bac
 
 ### Persistent Mount of NAS on Mac
 
-Use the helper script to mount your NAS share with the credentials in `.env` (`NAS_USER`, `NAS_USERPASS`, `NAS_HOST`; optional `NAS_SHARE` defaults to `photos`; `NAS_MOUNT_POINT` defaults to `/Volumes/Photos`):
+Use the helper script to mount your NAS over **NFSv3**. Populate `.env` with `NAS_HOST`, `NAS_NFS_EXPORT` (e.g. `/volume1/photos`), and optionally tweak `NAS_MOUNT_POINT` / `NFS_MOUNT_OPTIONS`:
 
-```bash
-chmod +x scripts/setup_nas_mount.sh
-./scripts/setup_nas_mount.sh          # add --dry-run to preview without changes
-```
-
-The script runs entirely without `sudo`. Make sure `NAS_MOUNT_POINT` already exists and is writable by your macOS user (create it manually if you stick with `/Volumes/Photos`, or set `NAS_MOUNT_POINT` to a directory under your home folder). To prepare the default path once:
+The script will prompt for sudo because macOS requires elevated privileges for NFS mounts. Make sure `NAS_MOUNT_POINT` exists and is writable by your user (create it manually if you stick with `/Volumes/Photos`, or set it under your home folder). To prepare the default path once:
 
 ```bash
 sudo mkdir -p /Volumes/Photos
 sudo chown "$USER":staff /Volumes/Photos
 ```
 
-Re-run the script after reboots to reconnect, or add it to your login items if you want it mounted automatically. Unmount manually with `umount "$NAS_MOUNT_POINT"`.
-
-If you change `NAS_MOUNT_POINT`, remember to update any Docker bind mounts (see the files in `compose/`) so they point to the same path.
-
-Optional: create a user LaunchAgent so the mount script runs at login (and optionally retries):
-
 ```bash
-chmod +x scripts/setup_mount_launch_agent.sh
-./scripts/setup_mount_launch_agent.sh          # add --interval 900 to retry every 15 minutes
-launchctl load ~/Library/LaunchAgents/com.user.photo-mount.plist
+chmod +x scripts/setup_nas_mount.sh
+./scripts/setup_nas_mount.sh --dry-run   # preview actions
+./scripts/setup_nas_mount.sh             # mounts via sudo mount -t nfs …
 ```
 
-Disable with `launchctl unload ~/Library/LaunchAgents/com.user.photo-mount.plist`. Delete the plist if you no longer need the auto-mount.
+Re-run the script after reboots to remount manually. Unmount with `sudo umount "$NAS_MOUNT_POINT"`.
+
+Optional: Let the script configure **autofs** (requires sudo) so the share mounts on first access and remounts automatically:
+
+```bash
+./scripts/setup_nas_mount.sh --autofs
+```
+
+This drops a direct map in `/etc/auto_master.d/photo-stack.autofs` and `/etc/auto_photo_stack`. 
+
+!!! Note "Lazy mounting / empty folders"
+  `autofs` may make the mount point visible but not actually load its content until it is accessed.
+  After enabling, trigger the mount by explicitly accessing it (including the trailing slash):  
+  ```sh
+  source .env && ls "$NAS_MOUNT_POINT"/
+  ```
+
+Remove `/etc/auto_photo_stack` and the snippet from `/etc/auto_master.d` if you ever want to undo it.
+
+
+Spot check with
+```sh
+mount | grep nfs
+```
+
+You should see something like
+
+> {NAS_ADDR}:/volume1/photos on /Volumes/Photos (nfs)
+
+
+If you change `NAS_MOUNT_POINT`, remember to update any Docker bind mounts (see the files in `compose/`) so they point to the same path.
 
 ### 🐳 Docker Compose
  
