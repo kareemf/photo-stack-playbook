@@ -162,12 +162,17 @@ Optional: Let the script configure **autofs** (requires sudo) so the share mount
 
 This drops a direct map in `/etc/auto_master.d/photo-stack.autofs` and `/etc/auto_photo_stack`. 
 
-!!! Note "Lazy mounting / empty folders"
+!!! Note "Empty folders on host / lazy mounting"
   `autofs` may make the mount point visible but not actually load its content until it is accessed.
   After enabling, trigger the mount by explicitly accessing it (including the trailing slash):  
   ```sh
-  source .env && ls "$NAS_MOUNT_POINT"/
+  source .env && ls -al "$NAS_MOUNT_POINT"
   ```
+  
+!!! Note "Empty folders in container"
+  If your host machine has correctly mounted the NFS drive(s) (`source .env && ls "$NAS_MOUNT_POINT"/originals` returns expected content) but your containers' report them as empty (`docker compose --env-file .env -f compose/photoprism.yml exec photoprism ls -al originals` is empty), then
+  - Restart the container. NFS mounts after container boot aren't propagated: `docker compose --env-file .env -f compose/photoprism.yml restart photoprism`
+  - Check NFS permissions. Make sure that "All users mapped as admin" is enabled so that Docker's users have access to the host user's mounts
 
 Remove `/etc/auto_photo_stack` and the snippet from `/etc/auto_master.d` if you ever want to undo it.
 
@@ -185,29 +190,45 @@ You should see something like
 If you change `NAS_MOUNT_POINT`, remember to update any Docker bind mounts (see the files in `compose/`) so they point to the same path.
 
 ### 🐳 Docker Compose
- 
-*(See the `compose/` directory for full definitions.)*
+
+#### Docker Desktop: Increase Resource Allocations
+Photoprism in particular is resource intensive
+
+Docker Desktop -> Settings -> Resources:
+- Swap: at least 4GB
+- Memory: max out or close
+- CPU limit: max out or close
+
+!!! Note: "Signs of insufficient resources"
+  You'll know you don't have sufficient memory allocated if/when programs like `photoprism index` terminate with `Error 137`, which is an out-of-memory exception 
+
+Apply and restart
 
 #### FYI: Makefile Helpers
 Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or Caddy:
 
 ```bash
-make up # Start both stacks
+make up # Start all stacks
 make immich up
 make photoprism up
+make caddy up
 
-make pull # Refresh images for both stacks
+
+make pull # Refresh images for all stacks
 make immich pull
 make photoprism pull
+make caddy pull
 
-make down # Stop both stacks
+make down # Stop all stacks
 make immich down
 make photoprism down
+make caddy down
 
 make logs follow
 make immich logs
 make photoprism logs
-make logs # Aggregated tail logs for both stacks (tail=100, follow)
+make caddy logs
+make logs # Aggregated tail logs for all stacks (tail=100, follow)
 ```
 
 Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. 
