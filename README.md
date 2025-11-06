@@ -3,23 +3,22 @@
 A guide to deploying a self-hosted photo management stack.
 
 ## Goal
-Run [Immich](https://immich.app) (a Google Photos analog for mobile photo uploads and viewing) and [PhotoPrism](https://photoprism.app) (for metadata management and archiving) on a **Mac** with a **Docker-capable NAS**, using:
+Run [Immich](https://immich.app) (a Google Photos analog for mobile photo uploads and sharing) and [PhotoPrism](https://photoprism.app) (for metadata management and archiving) on a **Mac** with a **Docker-capable NAS**, using:
 
 * Shared NAS storage
 * Tailscale for secure remote access
 * Weekly automated backups via `launchd`
 * Version-controlled configuration
 
-Should work about the same on Linux but hasn't been tested
-
 ### Why Both Tools 
 Each tool has different capabilities/strengths
 
 * Immich has
-  * A mobile app for auto-uploads
-  * Sharing support (both albums and one-off links)
+  * A mobile app for [auto-uploads](https://docs.immich.app/features/automatic-backup)
+  * [Sharing](https://docs.immich.app/features/sharing) support (both albums and one-off links)
 * PhotoPrism has
-  * Better RAW support ([#exclude-raws](#exclude-raws) vs [PP](https://docs.photoprism.app/developer-guide/media/raw/))
+  * Better RAW support
+    * [Immich wants to #exclude-raws](#exclude-raws) vs [PP's goal of supporting](https://docs.photoprism.app/developer-guide/media/raw/)
   * More focus on the (solitary) organization experience 
 
 ### 🔄 Daily Usage / Workflow
