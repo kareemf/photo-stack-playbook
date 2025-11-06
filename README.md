@@ -3,7 +3,7 @@
 A guide to deploying a self-hosted photo management stack.
 
 ## Goal
-Run [Immich](https://immich.app) (a Google Photos analog for mobile photo uploads and viewing) and [PhotoPrism](https://photoprism.app) (a Adobe Lightroom analog for metadata management and archival) on a **Mac** with a **Docker-capable NAS**, using:
+Run [Immich](https://immich.app) (a Google Photos analog for mobile photo uploads and viewing) and [PhotoPrism](https://photoprism.app) (for metadata management and archiving) on a **Mac** with a **Docker-capable NAS**, using:
 
 * Shared NAS storage
 * Tailscale for secure remote access
@@ -11,6 +11,16 @@ Run [Immich](https://immich.app) (a Google Photos analog for mobile photo upload
 * Version-controlled configuration
 
 Should work about the same on Linux but hasn't been tested
+
+### Why Both Tools 
+Each tool has different capabilities/strengths
+
+* Immich has
+  * A mobile app for auto-uploads
+  * Sharing support (both albums and one-off links)
+* PhotoPrism has
+  * Better RAW support ([#exclude-raws](#exclude-raws) vs [PP](https://docs.photoprism.app/developer-guide/media/raw/))
+  * More focus on the (solitary) organization experience 
 
 ### 🔄 Daily Usage / Workflow
 
@@ -170,7 +180,7 @@ This drops a direct map in `/etc/auto_master.d/photo-stack.autofs` and `/etc/aut
   ```
   
 !!! Note "Empty folders in container"
-  If your host machine has correctly mounted the NFS drive(s) (`source .env && ls "$NAS_MOUNT_POINT"/originals` returns expected content) but your containers' report them as empty (`docker compose --env-file .env -f compose/photoprism.yml exec photoprism ls -al originals` is empty), then
+  If your host machine has correctly mounted the NFS drive(s) (`source .env && ls "$NAS_MOUNT_POINT"/originals` returns expected content) but your containers' report them as empty (`docker compose --env-file .env -f compose/photoprism.yml exec photoprism ls -al originals` and/or `docker compose --env-file .env -f compose/immich.yml exec immich-server ls -al /originals` are empty), then
   - Restart the container. NFS mounts after container boot aren't propagated: `docker compose --env-file .env -f compose/photoprism.yml restart photoprism`
   - Check NFS permissions. Make sure that "All users mapped as admin" is enabled so that Docker's users have access to the host user's mounts
 
@@ -298,7 +308,8 @@ Official docs: https://docs.immich.app/features/libraries/
 #### Exclude RAWs
 
 > We don't want to import the raw files to Immich
- Official docs: https://docs.immich.app/features/libraries/
+
+- Official docs: https://docs.immich.app/features/libraries/
   
 * Menu -> Scan Settings -> Add exlusion pattern
 * Add: `**/*.{arw,cr2,cr3,dng,nef,orf,pef,raf,rw2,srw}`
