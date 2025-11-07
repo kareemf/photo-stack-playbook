@@ -135,6 +135,8 @@ mkdir -p ~/immich/
 
 On your storage device
 
+!!! Note: Replace `~` with the appropriate location, e.g. `/volume1`
+
 ```sh
 mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage},immich,backups}
 ```
@@ -216,17 +218,29 @@ Apply and restart
 #### FYI: Makefile Helpers
 Keeps the `.env` file wired in and lets you control Immich, PhotoPrism, or Caddy:
 
+
+!!! Note: Installing `make`
+  On Mac OS, running `make` should prompt you to install Xcode Command Line Tools if you haven't already. 
+
+  For Debian based Linux distros such as what might be on a NAS , if `which make` is empty
+  ```sh
+  sudo apt update
+  sudo apt --fix-broken install # if necessary
+  sudo apt install make
+  ```
+
+Once `make` is installed, the following commands are some of those available:
+
 ```bash
-make up # Start all stacks
-make immich up
-make photoprism up
-make caddy up
-
-
 make pull # Refresh images for all stacks
 make immich pull
 make photoprism pull
 make caddy pull
+
+make up # Start all stacks
+make immich up
+make photoprism up
+make caddy up
 
 make down # Stop all stacks
 make immich down
