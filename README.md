@@ -448,7 +448,7 @@ In either case, the end state should be
 - Your home stack stays private behind Tailscale and/or Cloudflare
 - End‑to‑end encryption with TLS certificates
 
-#### Cloudflare Tunnel
+#### Cloudflare Tunnel (Easiest)
 
 Like Tailscale Funnel, [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/) keeps services private but reachable without port-forwarding or setting up a VPS. Unlike Funnel, it supports custom domains 
 
@@ -483,21 +483,37 @@ The setup varies based on two key decisions:
 
 This setup assumes `cloudflared` runs on the same machine as your Docker containers.
 
-###### 1. Install cloudflared
+###### 1. Use the bundled Docker Compose service
+
+Use  `compose/cloudflare.yml` if you don’t want to `brew install cloudflare`
+
+Add `CLOUDFLARE_TUNNEL_TOKEN` to `.env`. The compose service already binds `${HOME}/.cloudflared` into `/home/nonroot/.cloudflared`, so `cloudflared` will find `cert.pem` there automatically after you run `tunnel login` once.
+
+Then
 
 ```bash
-brew install cloudflare/cloudflare/cloudflared
-```
-
-To start cloudflared now and restart at login:
-```sh
-brew services start cloudflared
+make cloudflare pull
 ```
 
 ###### 2. Authenticate with Cloudflare
 
 ```bash
-cloudflared tunnel login
+mkdir -p ~/.cloudflared
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel login
+```
+
+Then manage the tunnel container with:
+
+```bash
+make cloudflare up     # start or restart the tunnel
+make cloudflare logs follow  # tail tunnel output
+make cloudflare down   # stop the tunnel
+```
+
+For the CLI steps below (`tunnel login`, `tunnel create`, etc.), reuse the same container image:
+
+```bash
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare <command>
 ```
 
 This opens a browser for authentication and downloads credentials to `~/.cloudflared/`.
@@ -505,7 +521,7 @@ This opens a browser for authentication and downloads credentials to `~/.cloudfl
 ###### 3. Create a tunnel
 
 ```bash
-cloudflared tunnel create photos-tunnel
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel create photos-tunnel
 ```
 
 Note the tunnel ID shown in the output (e.g., `a1b2c3d4-e5f6-...`).
@@ -533,9 +549,9 @@ ingress:
 ###### 5. Create DNS records
 
 ```bash
-cloudflared tunnel route dns photo-tunnel example.com
-cloudflared tunnel route dns photo-tunnel prism.example.com
-cloudflared tunnel route dns photo-tunnel immich.example.com
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel route dns photo-tunnel example.com
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel route dns photo-tunnel prism.example.com
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel route dns photo-tunnel immich.example.com
 ```
 
 This creates CNAME records in Cloudflare DNS pointing to your tunnel.
@@ -574,15 +590,13 @@ PHOTOPRISM_PUBLIC_DOMAIN=prism.example.com
 
 ###### 8. Start the tunnel
 
-```bash
-# Test run (foreground)
-cloudflared tunnel run photo-tunnel
+Bring up the containerized daemon when you’re ready to serve traffic:
 
-# Install as a service (runs at boot)
-sudo cloudflared service install
-sudo launchctl start com.cloudflare.cloudflared  # macOS
-# or: sudo systemctl start cloudflared  # Linux
+```bash
+make cloudflare up
 ```
+
+Use `make cloudflare logs` to monitor it and `make cloudflare down` to stop it.
 
 ###### 9. Restart Caddy
 
