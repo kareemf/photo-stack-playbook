@@ -126,6 +126,8 @@ ln -s .env compose/.env
 
 On the host machine storage device
 
+Put your database files (a couple GBs) on a local drive, ideally SSD
+
 ```sh
 mkdir -p ~/photoprism/
 mkdir -p ~/immich/
@@ -135,10 +137,10 @@ mkdir -p ~/immich/
 
 On your storage device
 
-!!! Note: Replace `~` with the appropriate location, e.g. `/volume1`
+!!! note: replace `/volume1` with the appropriate value for your NAS
 
 ```sh
-mkdir -p ~/photos/{originals,uploads/from-immich,photoprism/{storage},immich,backups}
+mkdir -p /volume1/photos/{originals,uploads/from-immich,photoprism/{storage},immich,backups}
 ```
 
 ...or do it manually
@@ -485,6 +487,11 @@ This setup assumes `cloudflared` runs on the same machine as your Docker contain
 
 ```bash
 brew install cloudflare/cloudflare/cloudflared
+```
+
+To start cloudflared now and restart at login:
+```sh
+brew services start cloudflared
 ```
 
 ###### 2. Authenticate with Cloudflare
