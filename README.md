@@ -32,6 +32,10 @@ Each tool has different capabilities/strengths
 5. Run weekly DB backups → NAS `/photos/backups/`
 6. Remote access via Tailscale (private) or Caddy (public)
 
+### Documentation Principles
+* Automate where possible, document what remains
+* Make things configurable with reasonable defaults
+
 ## 🧬 Architecture Overview
 
 ```mermaid
@@ -497,26 +501,50 @@ make cloudflare pull
 
 ###### 2. Authenticate with Cloudflare
 
+Create the credentials directory and set proper permissions:
+
+**2a If Running On Mac**
+Create the default `CLOUDFLARE_CERTS_DIR`
 ```bash
 mkdir -p ~/.cloudflared
+```
+
+Login
+
+```bash
 docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel login
 ```
 
-Then manage the tunnel container with:
+**2b If Running On NAS**
+On NAS (Synology or similar), you need to ensure the `nonroot` user (UID 65532) can write to the directory:
+
+```bash
+# On NAS - use the path from CLOUDFLARE_CERTS_DIR in your .env
+sudo mkdir -p /volume2/.cloudflared
+sudo chown 65532:65532 /volume2/.cloudflared
+sudo chmod 777 /volume2/.cloudflared
+```
+
+Then run the login command:
+
+```bash
+# On NAS
+docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare tunnel login
+```
+
+---
+
+This opens a browser for authentication and downloads credentials to the mounted directory.
+
+In either case, verify that you have a `cert.pem` file in your `CLOUDFLARE_CERTS_DIR` location
+
+Once logged in, you can manage the tunnel container with:
 
 ```bash
 make cloudflare up     # start or restart the tunnel
 make cloudflare logs follow  # tail tunnel output
 make cloudflare down   # stop the tunnel
 ```
-
-For the CLI steps below (`tunnel login`, `tunnel create`, etc.), reuse the same container image:
-
-```bash
-docker compose --env-file .env -f compose/cloudflare.yml run --rm cloudflare <command>
-```
-
-This opens a browser for authentication and downloads credentials to `~/.cloudflared/`.
 
 ###### 3. Create a tunnel
 
@@ -529,6 +557,13 @@ Note the tunnel ID shown in the output (e.g., `a1b2c3d4-e5f6-...`).
 ###### 4. Configure DNS routing
 
 Setup through the web GUI or create `~/.cloudflared/config.yml`:
+
+!!! Note: localhost:80 vs other potential values
+  - If you are _not_ planning to run Caddy, you can tunnel directly to your application ports
+    - Immich: http://localhost:2283
+    - Photoprism: http://localhost:2342
+  - If you've changed `CADDY_HTTP_PORT` to a value besides `80`, e.g. if there's already a web server running on that port, use your CADDY_HTTP_PORT value, e.g.
+    - http://localhost:8080
 
 ```yaml
 tunnel: photo-tunnel  # or use the tunnel ID

@@ -34,6 +34,8 @@ http://{$IMMICH_PUBLIC_DOMAIN} {
 }
 
 # Tailscale entrypoint when using MagicDNS + tailscale cert
+# !!! Comment out/remove the section if you don't want/need to access your apps over HTTPS  via their tailnet address
+# E.g. I you don't care about mac.tail123.ts.net:2283 loading PhotoPrism
 {$TS_NODE} {
   tls /etc/certs/{$TS_NODE}.crt /etc/certs/{$TS_NODE}.key
   encode gzip zstd

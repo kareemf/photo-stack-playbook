@@ -13,5 +13,5 @@ services:
       TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"
     network_mode: "host"
     volumes:
-      - ${HOME}/.cloudflared:/home/nonroot/.cloudflared:rw
+      - ${CLOUDFLARE_CERTS_DIR:-$HOME/.cloudflared}:/home/nonroot/.cloudflared:rw
       - /etc/localtime:/etc/localtime:ro
