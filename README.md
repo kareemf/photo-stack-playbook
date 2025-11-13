@@ -76,6 +76,7 @@ photo-stack/
 │   ├── immich.yml
 │   └── photoprism.yml
 │   └── caddy.yml
+│   └── cloudflare.yml
 ├── scripts/
 │   └── setup_nas_mount.sh
 │   └── setup_backup_launch_agent.sh
@@ -869,6 +870,21 @@ make caddy down && make caddy up && make caddy logs follow
 |                         | `make immich pull && make immich up`                                                                                                                   |
 |                         | `make photoprism pull && make photoprism up`                                                                                                           |
 | Check launch agents     | tail ~/Library/Logs/photo-mount-error.log ~/Library/Logs/photo-mount.log ~/Library/Logs/photo-backup-dbs-error.log ~/Library/Logs/photo-backup-dbs.log |
+
+
+### Restoring PhotoPrism's own backup
+
+If you've moved PhotoPrism's storage location or need to restore from a backup (when `PHOTOPRISM_BACKUP_DATABASE: "true"` is enabled):
+
+```bash
+# First verify the backup exists from container's perspective
+docker compose -f compose/photoprism.yml exec photoprism ls -la /photoprism/storage/backup/mysql/
+
+# Restore from the latest backup file
+docker compose -f compose/photoprism.yml exec photoprism photoprism restore -i /photoprism/storage/backup/mysql/YYYY-MM-DD.sql
+```
+
+**Note:** Use the container path `/photoprism/storage/...`, not the host path. PhotoPrism automatically creates daily backups in `storage/backup/mysql/` when backup is enabled.
 
 ## 📚 References
 
