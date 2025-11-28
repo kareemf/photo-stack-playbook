@@ -1,7 +1,7 @@
-.PHONY: up down pull logs index immich photoprism all caddy cloudflare follow force
+.PHONY: up down pull logs index immich photoprism all caddy cloudflare watchtower follow force
 
 STACK ?= all
-STACK_TARGETS := immich photoprism all caddy cloudflare
+STACK_TARGETS := immich photoprism all caddy cloudflare watchtower
 
 FIRST_GOAL := $(firstword $(MAKECMDGOALS))
 
@@ -17,7 +17,8 @@ COMPOSE_FILES_immich := $(COMPOSE_DIR)/immich.yml
 COMPOSE_FILES_photoprism := $(COMPOSE_DIR)/photoprism.yml
 COMPOSE_FILES_caddy := $(COMPOSE_DIR)/caddy.yml
 COMPOSE_FILES_cloudflare := $(COMPOSE_DIR)/cloudflare.yml
-COMPOSE_FILES_all := $(COMPOSE_FILES_immich) $(COMPOSE_FILES_photoprism) $(COMPOSE_FILES_caddy) $(COMPOSE_FILES_cloudflare)
+COMPOSE_FILES_watchtower := $(COMPOSE_DIR)/watchtower.yml
+COMPOSE_FILES_all := $(COMPOSE_FILES_immich) $(COMPOSE_FILES_photoprism) $(COMPOSE_FILES_caddy) $(COMPOSE_FILES_cloudflare) $(COMPOSE_FILES_watchtower)
 
 COMPOSE_FILES = $(COMPOSE_FILES_$(STACK))
 
@@ -59,7 +60,7 @@ index:
 	echo "Running PhotoPrism indexing command: $$cmd"; \
 	$(call compose_with,$(COMPOSE_FILES)) exec photoprism $$cmd
 
-immich photoprism all caddy cloudflare:
+immich photoprism all caddy cloudflare watchtower:
 	@true
 
 follow:

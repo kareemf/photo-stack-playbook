@@ -60,13 +60,14 @@ graph TD
 
 ### 🧩 Summary Table
 
-| Task                | Tool       | Host | Notes                    |
-| ------------------- | ---------- | ---- | ------------------------ |
-| Auto uploads        | Immich     | Mac  | Mobile → NAS             |
-| Metadata management | PhotoPrism | NAS  | XMP + tagging            |
-| Private access      | Tailscale  | All  | Encrypted mesh VPN       |
-| Public sharing      | Caddy      | Mac  | HTTPS + domain           |
-| Weekly backup       | launchd    | Mac  | To NAS `/photos/backups` |
+| Task                | Tool       | Host | Notes                       |
+| ------------------- | ---------- | ---- | --------------------------- |
+| Auto uploads        | Immich     | Mac  | Mobile → NAS                |
+| Metadata management | PhotoPrism | NAS  | XMP + tagging               |
+| Private access      | Tailscale  | All  | Encrypted mesh VPN          |
+| Public sharing      | Caddy      | Mac  | HTTPS + domain              |
+| Weekly backup       | launchd    | Mac  | To NAS `/photos/backups`    |
+| Auto updates        | Watchtower | Mac  | Daily at 3AM EST            |
 
 ## 📂 Repository Structure
 
@@ -74,9 +75,10 @@ graph TD
 photo-stack/
 ├── compose/
 │   ├── immich.yml
-│   └── photoprism.yml
-│   └── caddy.yml
-│   └── cloudflare.yml
+│   ├── photoprism.yml
+│   ├── caddy.yml
+│   ├── cloudflare.yml
+│   └── watchtower.yml
 ├── scripts/
 │   └── setup_nas_mount.sh
 │   └── setup_backup_launch_agent.sh
@@ -243,26 +245,54 @@ make pull # Refresh images for all stacks
 make immich pull
 make photoprism pull
 make caddy pull
+make watchtower pull
 
 make up # Start all stacks
 make immich up
 make photoprism up
 make caddy up
+make watchtower up
 
 make down # Stop all stacks
 make immich down
 make photoprism down
 make caddy down
+make watchtower down
 
 make logs follow
 make immich logs
 make photoprism logs
 make caddy logs
+make watchtower logs
 make logs # Aggregated tail logs for all stacks (tail=100, follow)
 ```
 
-Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`. 
+Internally the Makefile shells out to `docker compose --env-file .env -f compose/<stack>.yml …`.
 Override `ENV_FILE`, `STACK`, or `TAIL` on the command line if needed (e.g. `make STACK=immich TAIL=200 logs`).
+
+#### Automatic Updates with Watchtower
+
+[Watchtower](https://containrrr.dev/watchtower/) automatically monitors and updates all Docker containers when new images are available.
+
+**Configuration:**
+- **Schedule:** Daily at 3AM EST (8AM UTC)
+- **Scope:** Monitors ALL containers (Immich, PhotoPrism, Caddy, Cloudflared)
+- **Cleanup:** Automatically removes old images after updating
+- **Zero downtime:** Restarts containers with updated images
+
+**Usage:**
+```bash
+# Start Watchtower (included in 'make up')
+make watchtower up
+
+# View logs
+make watchtower logs
+
+# Stop Watchtower
+make watchtower down
+```
+
+**Note:** Watchtower runs as a single service but monitors all containers on your Docker host via the Docker socket. You don't need to add it to each compose file.
 
 
 💡 Handy commands once everything is up and running

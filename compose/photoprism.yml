@@ -132,19 +132,6 @@ services:
       MARIADB_PASSWORD: ${PHOTOPRISM_DB_PASS}
       MARIADB_ROOT_PASSWORD: ${PHOTOPRISM_DB_ROOT}
 
-  ## Watchtower upgrades services automatically (optional)
-  ## see https://docs.photoprism.app/getting-started/updates/#watchtower
-  #
-  # watchtower:
-  #   restart: unless-stopped
-  #   image: containrrr/watchtower
-  #   environment:
-  #     WATCHTOWER_CLEANUP: "true"
-  #     WATCHTOWER_POLL_INTERVAL: 7200 # checks for updates every 2 hours
-  #   volumes:
-  #     - "/var/run/docker.sock:/var/run/docker.sock"
-  #     - "~/.docker/config.json:/config.json" # optional, for authentication if you have a Docker Hub account
-
 ## Create named volumes, advanced users may remove this if they mount a regular host folder
 ## for the database or use SQLite instead (never remove otherwise)
 volumes:
