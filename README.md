@@ -345,17 +345,19 @@ docker compose --env-file .env -f compose/photoprism.yml logs -f --tail=100 phot
 PhotoPrism should be available at http://127.0.0.1:2342/
 Immich should be available at http://127.0.0.1:2283/
 
-### Immich: Import Read-Only Library
+### Immich:
+
+#### Import Read-Only Library
 Official docs: https://docs.immich.app/features/libraries/
 
-#### Add library
+##### Add library
 * Login. 
 * Go to http://localhost:2283/admin/library-management
 * Add `/originals` when asked for the path, which should line up with the volume mounted in immich.yml (`${NAS_MOUNT_POINT}/originals:/originals:ro`)
 * Hit Validate
 * Hit Save
 
-#### Exclude RAWs
+##### Exclude RAWs
 
 > We don't want to import the raw files to Immich
 
@@ -368,6 +370,14 @@ Official docs: https://docs.immich.app/features/libraries/
 !!! Note
   If you add additional volumes, expose them to both `immich-server` and `database`
 
+#### Enable network-based connection switching.
+
+When on Wi-Fi, use a local device address instead of going through Cloudflare Tunnel. That eliminates Cloudflare's 100MB file transfer limit as a factor. In general, should just be faster since transfers stay on local network without a trip through the internet. 
+
+Use your `IMMICH_PUBLIC_DOMAIN` (e.g. https://immich.example.com) as the "External Network" URL and a local address for the Local Network URL (e.g. http://nas.local:2283)
+
+!!! Note "Cloud flare Tunnel has a 100mb file limit"
+If you notice that movie backups are getting stuck and blocking other transfers, you're likely running into this file size issue. Switch to a local/direct connection that doesn't rely on tunneling.
 
 ### Photoprism: Performance Considerations & Troubleshooting
 #### Empty index after restart
